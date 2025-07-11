@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../socket/socket";
 
-const ChatRoom = ({ username, room }) => {
+const ChatRoom = ({ username, room, darkMode }) => {
   const {
     messages,
     sendMessage,
@@ -17,19 +17,6 @@ const ChatRoom = ({ username, room }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef();
-
-  // ✅ Background colors per room
-  const getRoomBackground = (roomName) => {
-    const themes = {
-      global: "#f0f8ff", // light blue
-      room1: "#fff8dc", // cornsilk
-      room2: "#f5f5f5", // light gray
-      room3: "#e6ffe6", // mint green
-    };
-    if (themes[roomName]) return themes[roomName];
-    if (roomName.includes("-")) return "#f9f0ff"; // private room
-    return "#ffffff"; // fallback
-  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,89 +85,113 @@ const ChatRoom = ({ username, room }) => {
           href={msg.message}
           target="_blank"
           rel="noreferrer"
-          style={{ wordBreak: "break-all", color: "#007bff" }}
+          style={{ color: darkMode ? "#90cdf4" : "#0366d6" }}
         >
           {msg.message.split("/").pop()}
         </a>
       ) : (
-        <span style={{ wordBreak: "break-word" }}>{msg.message}</span>
+        msg.message
       );
     } else {
       return JSON.stringify(msg.message);
     }
   };
 
+  const containerStyle = {
+    backgroundColor: darkMode ? "#121212" : "#f4f4f4",
+    color: darkMode ? "#e0e0e0" : "#000",
+    minHeight: "100vh",
+    padding: 10,
+    display: "flex",
+    justifyContent: "center",
+  };
+
+  const chatBoxStyle = {
+    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+    border: "1px solid #ccc",
+    borderRadius: 8,
+    padding: 10,
+    width: "100%",
+    maxWidth: 600,
+    display: "flex",
+    flexDirection: "column",
+    height: "90vh",
+  };
+
+  const messageAreaStyle = {
+    flex: 1,
+    overflowY: "auto",
+    marginBottom: 10,
+    padding: 5,
+  };
+
+  const inputAreaStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 5,
+  };
+
+  const buttonStyle = {
+    padding: "8px 14px",
+    borderRadius: 4,
+    border: "none",
+    cursor: "pointer",
+    backgroundColor: uploading ? "#999" : "#007bff",
+    color: "#fff",
+    fontWeight: "bold",
+    transition: "background-color 0.3s",
+  };
+
   return (
-    <div
-      style={{
-        backgroundColor: getRoomBackground(room),
-        minHeight: "100vh",
-        padding: 20,
-      }}
-    >
-      {/* Chat box */}
-      <div
-        style={{
-          border: "1px solid #ccc",
-          borderRadius: 5,
-          padding: 10,
-          height: 300,
-          overflowY: "auto",
-          backgroundColor: "#fff",
-        }}
-      >
-        {messages
-          .filter((msg) => msg.room === room || msg.isPrivate)
-          .map((msg, i) => (
-            <div key={i} style={{ marginBottom: 8 }}>
-              {msg.system ? (
-                <em>{msg.message}</em>
-              ) : (
-                <p style={{ margin: 0 }}>
-                  <strong>{msg.sender}:</strong> {renderMessage(msg)} <br />
-                  <small>
-                    {msg.readBy?.length}/{users.length} read
-                  </small>
-                </p>
-              )}
-            </div>
-          ))}
-        <div ref={messagesEndRef} />
-      </div>
+    <div style={containerStyle}>
+      <div style={chatBoxStyle}>
+        <div style={messageAreaStyle}>
+          {messages
+            .filter((msg) => msg.room === room || msg.isPrivate)
+            .map((msg, i) => (
+              <div key={i} style={{ marginBottom: 6 }}>
+                {msg.system ? (
+                  <em>{msg.message}</em>
+                ) : (
+                  <p style={{ margin: 0 }}>
+                    <strong>{msg.sender}:</strong> {renderMessage(msg)} ·{" "}
+                    <small>
+                      {msg.readBy?.length}/{users.length} read
+                    </small>
+                  </p>
+                )}
+              </div>
+            ))}
+          <div ref={messagesEndRef} />
+        </div>
 
-      {/* Typing status */}
-      {typingUsers.length > 0 && (
-        <p style={{ fontStyle: "italic", marginTop: 8 }}>
-          {typingUsers.join(", ")} is typing...
-        </p>
-      )}
+        {typingUsers.length > 0 && (
+          <p style={{ fontStyle: "italic", marginBottom: 5 }}>
+            {typingUsers.join(", ")} is typing...
+          </p>
+        )}
 
-      {/* Message input */}
-      <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
-        <input
-          value={message}
-          onChange={(e) => {
-            setMessage(e.target.value);
-            setTyping(true);
-          }}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="Type a message"
-          style={{ flex: 1, padding: 8 }}
-        />
-        <input type="file" onChange={handleFileChange} style={{ flex: 1 }} />
-        <button
-          onClick={handleSend}
-          disabled={uploading}
-          style={{
-            padding: "0 12px",
-            backgroundColor: "#007bff",
-            color: "white",
-            border: "none",
-            cursor: uploading ? "not-allowed" : "pointer",
-          }}
-        >
-          {uploading ? "Uploading..." : "Send"}
-        </button>
+        <div style={inputAreaStyle}>
+          <input
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              setTyping(true);
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="Type a message"
+            style={{
+              flex: "1 1 60%",
+              padding: 8,
+              borderRadius: 4,
+              border: "1px solid #ccc",
+            }}
+          />
+          <input type="file" onChange={handleFileChange} />
+          <button onClick={handleSend} disabled={uploading} style={buttonStyle}>
+            {uploading ? "Uploading..." : "Send"}
+          </button>
+        </div>
       </div>
     </div>
   );
