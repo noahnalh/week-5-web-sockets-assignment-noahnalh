@@ -1,5 +1,3 @@
-// socket.js - Socket.io client setup
-
 import { io } from "socket.io-client";
 import { useEffect, useState, useRef } from "react";
 
