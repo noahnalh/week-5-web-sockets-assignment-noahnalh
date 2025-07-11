@@ -161,7 +161,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Private messaging (fixed)
+  // ✅ Enhanced Private messaging with notification
   socket.on("private_message", ({ to, message }) => {
     const fromUser = users[socket.id];
     const toSocketId = Object.keys(users).find(
@@ -193,8 +193,13 @@ io.on("connection", (socket) => {
       recipientSocket.join(room);
     }
 
-    // Emit to the private room (both users will receive)
+    // ✅ 1. Emit to room (if both are inside)
     io.to(room).emit("private_message", privateMsg);
+
+    // ✅ 2. Direct notification to recipient even if not in the room
+    if (recipientSocket && toSocketId !== socket.id) {
+      recipientSocket.emit("receive_message", privateMsg);
+    }
   });
 
   // Disconnect

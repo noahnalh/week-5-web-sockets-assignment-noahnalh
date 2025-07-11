@@ -1,4 +1,3 @@
-// src/socket/socket.js
 import { io } from "socket.io-client";
 import { useEffect, useState, useRef } from "react";
 
@@ -18,7 +17,7 @@ export const useSocket = () => {
   const [users, setUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
   const [currentRoom, setCurrentRoom] = useState("global");
-  const [unreadCounts, setUnreadCounts] = useState({}); // ✅
+  const [unreadCounts, setUnreadCounts] = useState({});
 
   const usernameRef = useRef("");
   const roomRef = useRef("global");
@@ -32,8 +31,8 @@ export const useSocket = () => {
     usernameRef.current = username;
     roomRef.current = room;
     setCurrentRoom(room);
-    setMessages([]); // Reset current room messages
-    setUnreadCounts((prev) => ({ ...prev, [room]: 0 })); // ✅ Reset unread
+    setMessages([]);
+    setUnreadCounts((prev) => ({ ...prev, [room]: 0 }));
 
     if (room === "global") {
       socket.emit("user_join", username);
@@ -69,9 +68,12 @@ export const useSocket = () => {
     });
   };
 
-  // Handle incoming messages
   const handleIncomingMessage = (message) => {
+    const currentUsername = usernameRef.current;
+    const room = roomRef.current;
+
     setLastMessage(message);
+
     setMessages((prev) => {
       const exists = prev.find((m) => m.id === message.id);
       return exists
@@ -79,13 +81,21 @@ export const useSocket = () => {
         : [...prev, message];
     });
 
+    // ✅ Handle unread count if message is not in current room
     const incomingRoom = message.room;
 
-    if (incomingRoom !== roomRef.current) {
+    if (incomingRoom !== room) {
       setUnreadCounts((prev) => ({
         ...prev,
         [incomingRoom]: (prev[incomingRoom] || 0) + 1,
       }));
+
+      // ✅ Optional: show system notification or browser alert here
+      // if (Notification.permission === "granted") {
+      //   new Notification(`New message from ${message.sender}`, {
+      //     body: message.message,
+      //   });
+      // }
     }
   };
 
@@ -104,7 +114,9 @@ export const useSocket = () => {
       }
     };
 
-    const handleDisconnect = () => setIsConnected(false);
+    const handleDisconnect = () => {
+      setIsConnected(false);
+    };
 
     const handleMessageRead = ({ messageId, readerId }) => {
       setMessages((prev) =>
@@ -125,7 +137,9 @@ export const useSocket = () => {
       );
     };
 
-    const handleUserList = (list) => setUsers(list);
+    const handleUserList = (list) => {
+      setUsers(list);
+    };
 
     const handleUserJoined = (user) => {
       setMessages((prev) => [
@@ -155,7 +169,7 @@ export const useSocket = () => {
       setTypingUsers(usersTyping);
     };
 
-    // Register events
+    // Register socket events
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("receive_message", handleIncomingMessage);
@@ -171,7 +185,7 @@ export const useSocket = () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("receive_message", handleIncomingMessage);
-      socket.off("private_message", handleIncomingMessage); // ✅ cleanup
+      socket.off("private_message", handleIncomingMessage);
       socket.off("message_read", handleMessageRead);
       socket.off("message_updated", handleMessageUpdated);
       socket.off("user_list", handleUserList);
@@ -196,7 +210,7 @@ export const useSocket = () => {
     setTyping,
     markMessageAsRead,
     addReaction,
-    unreadCounts, // ✅ expose
+    unreadCounts, // ✅ expose unread counts per room
   };
 };
 

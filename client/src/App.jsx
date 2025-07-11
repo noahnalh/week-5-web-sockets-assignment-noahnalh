@@ -8,7 +8,13 @@ const App = () => {
   const [currentRoom, setCurrentRoom] = useState("global");
   const [darkMode, setDarkMode] = useState(false);
 
-  const { connect, isConnected, users, joinRoom } = useSocket();
+  const {
+    connect,
+    isConnected,
+    users,
+    joinRoom,
+    unreadCounts, // ✅ pull in unread count
+  } = useSocket();
 
   const handleLogin = () => {
     if (username.trim()) {
@@ -18,14 +24,9 @@ const App = () => {
     }
   };
 
-  // ✅ Fix: Use usernames to form consistent private room names
-  const handleRoomJoin = (targetUsername) => {
-    const privateRoom =
-      targetUsername === "global"
-        ? "global"
-        : [username, targetUsername].sort().join("_");
-    joinRoom(username, privateRoom);
-    setCurrentRoom(privateRoom);
+  const handleRoomJoin = (room) => {
+    joinRoom(username, room);
+    setCurrentRoom(room);
   };
 
   const pageStyle = {
@@ -73,24 +74,44 @@ const App = () => {
               Current Room:{" "}
               {currentRoom === "global"
                 ? "🌐 Global Chat"
-                : `💬 Private Chat: ${currentRoom.replaceAll("_", " vs ")}`}
+                : `💬 Chat with ${
+                    users.find((u) => u.id === currentRoom)?.username ||
+                    "Private"
+                  }`}
             </h3>
 
             <div style={{ marginBottom: 10 }}>
+              {/* Global Room Button */}
               <button onClick={() => handleRoomJoin("global")}>
-                🌐 Global Chat
+                🌐 Global Chat{" "}
+                {unreadCounts["global"] > 0 && (
+                  <span style={{ color: "red" }}>
+                    ({unreadCounts["global"]})
+                  </span>
+                )}
               </button>
+
+              {/* Private Chat Buttons */}
               {users
                 .filter((u) => u.username !== username)
-                .map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleRoomJoin(user.username)} // ✅ Fix here
-                    style={{ marginLeft: 5 }}
-                  >
-                    💬 Chat with {user.username}
-                  </button>
-                ))}
+                .map((user) => {
+                  const roomKey = [username, user.username].sort().join("_");
+
+                  return (
+                    <button
+                      key={user.id}
+                      onClick={() => handleRoomJoin(roomKey)}
+                      style={{ marginLeft: 5 }}
+                    >
+                      💬 Chat with {user.username}{" "}
+                      {unreadCounts[roomKey] > 0 && (
+                        <span style={{ color: "red" }}>
+                          ({unreadCounts[roomKey]})
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
             </div>
 
             <ChatRoom
