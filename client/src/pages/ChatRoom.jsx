@@ -15,21 +15,32 @@ const ChatRoom = ({ username, room }) => {
 
   const [message, setMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef();
 
-  // Scroll to bottom on new messages
+  // ✅ Background colors per room
+  const getRoomBackground = (roomName) => {
+    const themes = {
+      global: "#f0f8ff", // light blue
+      room1: "#fff8dc", // cornsilk
+      room2: "#f5f5f5", // light gray
+      room3: "#e6ffe6", // mint green
+    };
+    if (themes[roomName]) return themes[roomName];
+    if (roomName.includes("-")) return "#f9f0ff"; // private room
+    return "#ffffff"; // fallback
+  };
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Join room on mount/change
   useEffect(() => {
     if (username && room) {
       joinRoom(username, room);
     }
   }, [room, username]);
 
-  // Mark unread messages as read
   useEffect(() => {
     messages.forEach((msg) => {
       if (msg.room === room && !msg.readBy?.includes(username)) {
@@ -48,6 +59,7 @@ const ChatRoom = ({ username, room }) => {
       formData.append("file", selectedFile);
 
       try {
+        setUploading(true);
         const res = await fetch("http://localhost:5000/api/upload", {
           method: "POST",
           body: formData,
@@ -55,17 +67,14 @@ const ChatRoom = ({ username, room }) => {
 
         const data = await res.json();
         if (data?.fileUrl) {
-          finalMessage = {
-            type: "file",
-            url: data.fileUrl.startsWith("/")
-              ? `http://localhost:5000${data.fileUrl}`
-              : data.fileUrl,
-            name: selectedFile.name,
-          };
+          finalMessage = `http://localhost:5000${data.fileUrl}`;
         }
       } catch (err) {
         console.error("Upload failed", err);
         return;
+      } finally {
+        setUploading(false);
+        setSelectedFile(null);
       }
     }
 
@@ -79,58 +88,57 @@ const ChatRoom = ({ username, room }) => {
     if (file) setSelectedFile(file);
   };
 
-  const renderMessageContent = (msg) => {
-    const { message } = msg;
-
-    // File message
-    if (typeof message === "object" && message.type === "file") {
-      const { url, name } = message;
-      const isImage = /\.(png|jpe?g|gif|bmp|webp)$/i.test(name);
-      return isImage ? (
-        <div>
-          <img
-            src={url}
-            alt={name}
-            style={{ maxWidth: "200px", borderRadius: "6px", marginTop: "4px" }}
-          />
-          <div>
-            <small>{name}</small>
-          </div>
-        </div>
-      ) : (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          📎 {name}
-        </a>
+  const renderMessage = (msg) => {
+    if (typeof msg.message === "string") {
+      const isFileLink = msg.message.startsWith(
+        "http://localhost:5000/uploads/"
       );
+      return isFileLink ? (
+        <a
+          href={msg.message}
+          target="_blank"
+          rel="noreferrer"
+          style={{ wordBreak: "break-all", color: "#007bff" }}
+        >
+          {msg.message.split("/").pop()}
+        </a>
+      ) : (
+        <span style={{ wordBreak: "break-word" }}>{msg.message}</span>
+      );
+    } else {
+      return JSON.stringify(msg.message);
     }
-
-    // Regular text message
-    return <span>{message}</span>;
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: 800, margin: "0 auto" }}>
+    <div
+      style={{
+        backgroundColor: getRoomBackground(room),
+        minHeight: "100vh",
+        padding: 20,
+      }}
+    >
+      {/* Chat box */}
       <div
         style={{
           border: "1px solid #ccc",
+          borderRadius: 5,
           padding: 10,
           height: 300,
           overflowY: "auto",
-          borderRadius: 6,
-          background: "#fafafa",
+          backgroundColor: "#fff",
         }}
       >
         {messages
           .filter((msg) => msg.room === room || msg.isPrivate)
           .map((msg, i) => (
-            <div key={i} style={{ marginBottom: "12px" }}>
+            <div key={i} style={{ marginBottom: 8 }}>
               {msg.system ? (
                 <em>{msg.message}</em>
               ) : (
                 <p style={{ margin: 0 }}>
-                  <strong>{msg.sender}:</strong> {renderMessageContent(msg)}
-                  <br />
-                  <small style={{ color: "#888" }}>
+                  <strong>{msg.sender}:</strong> {renderMessage(msg)} <br />
+                  <small>
                     {msg.readBy?.length}/{users.length} read
                   </small>
                 </p>
@@ -140,13 +148,15 @@ const ChatRoom = ({ username, room }) => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Typing status */}
       {typingUsers.length > 0 && (
-        <p>
-          <em>{typingUsers.join(", ")} is typing...</em>
+        <p style={{ fontStyle: "italic", marginTop: 8 }}>
+          {typingUsers.join(", ")} is typing...
         </p>
       )}
 
-      <div style={{ marginTop: 10 }}>
+      {/* Message input */}
+      <div style={{ marginTop: 10, display: "flex", gap: 5 }}>
         <input
           value={message}
           onChange={(e) => {
@@ -155,14 +165,22 @@ const ChatRoom = ({ username, room }) => {
           }}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Type a message"
-          style={{ width: "60%", marginRight: 5, padding: "4px 8px" }}
+          style={{ flex: 1, padding: 8 }}
         />
-        <input
-          type="file"
-          onChange={handleFileChange}
-          style={{ marginRight: 5 }}
-        />
-        <button onClick={handleSend}>Send</button>
+        <input type="file" onChange={handleFileChange} style={{ flex: 1 }} />
+        <button
+          onClick={handleSend}
+          disabled={uploading}
+          style={{
+            padding: "0 12px",
+            backgroundColor: "#007bff",
+            color: "white",
+            border: "none",
+            cursor: uploading ? "not-allowed" : "pointer",
+          }}
+        >
+          {uploading ? "Uploading..." : "Send"}
+        </button>
       </div>
     </div>
   );
