@@ -1,278 +1,240 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../socket/socket";
 
-const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
-
 const ChatRoom = ({ username, room, darkMode }) => {
   const {
     messages,
     sendMessage,
+    sendPrivateMessage,
     typingUsers,
-    users,
-    joinRoom,
     setTyping,
     markMessageAsRead,
     addReaction,
   } = useSocket();
 
-  const [message, setMessage] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // ✅ search state
-  const messagesEndRef = useRef();
+  const [newMessage, setNewMessage] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef();
+  const bottomRef = useRef(null);
+
+  const isPrivate = room.includes("_");
+
+  // Filter messages for current room
+  const roomMessages = messages.filter((msg) => msg.room === room);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
-    if (username && room) {
-      joinRoom(username, room);
-    }
-  }, [room, username]);
-
-  useEffect(() => {
-    messages.forEach((msg) => {
-      if (msg.room === room && !msg.readBy?.includes(username)) {
-        markMessageAsRead(msg.id);
-      }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Mark all messages in room as read when room changes or messages update
+    roomMessages.forEach((msg) => {
+      if (!msg.readBy?.includes(username)) markMessageAsRead(msg.id);
     });
-  }, [messages, room]);
+  }, [roomMessages]);
 
-  const handleSend = async () => {
-    if (!message.trim() && !selectedFile) return;
+  const handleSend = () => {
+    if (!newMessage.trim()) return;
 
-    let finalMessage = message;
-
-    if (selectedFile) {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      try {
-        setUploading(true);
-        const res = await fetch("http://localhost:5000/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-        if (data?.fileUrl) {
-          finalMessage = `http://localhost:5000${data.fileUrl}`;
-        }
-      } catch (err) {
-        console.error("Upload failed", err);
-        return;
-      } finally {
-        setUploading(false);
-        setSelectedFile(null);
-      }
-    }
-
-    sendMessage(finalMessage, room);
-    setMessage("");
-    setSelectedFile(null);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
-  };
-
-  const renderMessage = (msg) => {
-    if (typeof msg.message === "string") {
-      const isFileLink = msg.message.startsWith(
-        "http://localhost:5000/uploads/"
-      );
-      return isFileLink ? (
-        <a
-          href={msg.message}
-          target="_blank"
-          rel="noreferrer"
-          style={{ color: darkMode ? "#90cdf4" : "#0366d6" }}
-        >
-          {msg.message.split("/").pop()}
-        </a>
-      ) : (
-        msg.message
-      );
+    if (isPrivate) {
+      const recipient = room.split("_").find((name) => name !== username);
+      sendPrivateMessage(recipient, newMessage);
     } else {
-      return JSON.stringify(msg.message);
+      sendMessage(newMessage, room);
+    }
+
+    setNewMessage("");
+    setTyping(false);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      setUploadProgress(0);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        const { fileUrl } = JSON.parse(xhr.responseText);
+        const link = `${window.location.origin}${fileUrl}`;
+        setNewMessage(link);
+        setUploadProgress(0);
+      };
+
+      xhr.send(formData);
+    } catch (error) {
+      console.error("Upload failed", error);
     }
   };
 
-  const containerStyle = {
-    backgroundColor: darkMode ? "#121212" : "#f4f4f4",
-    color: darkMode ? "#e0e0e0" : "#000",
-    minHeight: "100vh",
-    padding: "20px 10px",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
+  const formatTime = (iso) => {
+    const date = new Date(iso);
+    return `${date.getHours()}:${date
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
   };
 
-  const chatBoxStyle = {
-    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-    border: "1px solid #ccc",
-    borderRadius: 10,
-    padding: 15,
-    width: "100%",
-    maxWidth: "600px",
-    height: "80vh",
-    display: "flex",
-    flexDirection: "column",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+  const handleTyping = (e) => {
+    setNewMessage(e.target.value);
+    setTyping(e.target.value.length > 0);
   };
 
-  const messageAreaStyle = {
-    flex: 1,
-    overflowY: "auto",
-    marginBottom: 10,
-    padding: 5,
-    backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
-    borderRadius: 6,
+  const handleReaction = (id, emoji) => {
+    addReaction(id, emoji);
   };
 
-  const inputAreaStyle = {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 6,
-  };
-
-  const buttonStyle = {
-    padding: "8px 14px",
-    borderRadius: 4,
-    border: "none",
-    cursor: "pointer",
-    backgroundColor: uploading ? "#888" : "#007bff",
-    color: "#fff",
-    fontWeight: "bold",
-    flexShrink: 0,
-  };
-
-  const emojiBarStyle = {
-    marginTop: 4,
-    display: "flex",
-    gap: 6,
-    flexWrap: "wrap",
-  };
-
-  const emojiButtonStyle = {
-    cursor: "pointer",
-    padding: "2px 6px",
-    borderRadius: 4,
-    border: "1px solid #ccc",
-    background: darkMode ? "#333" : "#eee",
-    fontSize: "1rem",
-  };
-
-  const getReactionCount = (reactions = {}, emoji) => {
-    return reactions[emoji]?.length || 0;
-  };
-
-  const hasReacted = (reactions = {}, emoji) => {
-    const userId = username;
-    return reactions[emoji]?.includes(userId);
-  };
+  // Typing users excluding self
+  const otherTypingUsers = typingUsers.filter((u) => u !== username);
 
   return (
-    <div style={containerStyle}>
-      <div style={chatBoxStyle}>
-        {/* ✅ Search Bar */}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: 10,
+          backgroundColor: darkMode ? "#222" : "#fff",
+          borderRadius: 5,
+          border: "1px solid #ccc",
+        }}
+      >
+        {roomMessages.map((msg) => (
+          <div
+            key={msg.id}
+            style={{
+              marginBottom: 8,
+              padding: 6,
+              backgroundColor: msg.system
+                ? "transparent"
+                : msg.sender === username
+                ? darkMode
+                  ? "#4a4a4a"
+                  : "#d7fdd7"
+                : darkMode
+                ? "#2e2e2e"
+                : "#f0f0f0",
+              borderRadius: 6,
+              wordBreak: "break-word",
+            }}
+          >
+            {msg.system ? (
+              <i>{msg.message}</i>
+            ) : (
+              <>
+                <b>{msg.sender}</b>:{" "}
+                {msg.message.startsWith("http") ? (
+                  <a href={msg.message} target="_blank" rel="noreferrer">
+                    {msg.message}
+                  </a>
+                ) : (
+                  msg.message
+                )}
+                <div
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "#888",
+                    marginTop: 4,
+                  }}
+                >
+                  {formatTime(msg.timestamp)} | Read by:{" "}
+                  {msg.readBy?.length || 0}
+                </div>
+                <div style={{ marginTop: 5 }}>
+                  {["👍", "❤️", "😂", "🔥"].map((emoji) => {
+                    const count = msg.reactions?.[emoji]?.length || 0;
+                    const reacted = msg.reactions?.[emoji]?.includes(username);
+                    return (
+                      <button
+                        key={emoji}
+                        onClick={() => handleReaction(msg.id, emoji)}
+                        style={{
+                          marginRight: 5,
+                          background: reacted ? "#ccc" : "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "1rem",
+                        }}
+                      >
+                        {emoji} {count > 0 ? count : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div
+        style={{
+          marginTop: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+        }}
+      >
         <input
-          type="text"
-          placeholder="Search messages..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={newMessage}
+          onChange={handleTyping}
+          onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          placeholder="Type a message"
           style={{
-            marginBottom: 10,
-            padding: "6px 10px",
-            width: "100%",
+            flex: 1,
+            padding: 6,
             borderRadius: 4,
             border: "1px solid #ccc",
           }}
         />
-
-        <div style={messageAreaStyle}>
-          {messages
-            .filter((msg) => msg.room === room)
-            .filter((msg) =>
-              msg.message?.toLowerCase?.().includes(searchTerm.toLowerCase())
-            )
-            .map((msg, i) => {
-              const reactions = msg.reactions || {};
-              return (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  {msg.system ? (
-                    <em>{msg.message}</em>
-                  ) : (
-                    <>
-                      <p style={{ margin: 0 }}>
-                        <strong>{msg.sender}:</strong> {renderMessage(msg)} ·{" "}
-                        <small>
-                          {msg.readBy?.length}/{users.length} read
-                        </small>
-                      </p>
-
-                      <div style={emojiBarStyle}>
-                        {EMOJIS.map((emoji) => (
-                          <span
-                            key={emoji}
-                            style={{
-                              ...emojiButtonStyle,
-                              backgroundColor: hasReacted(reactions, emoji)
-                                ? darkMode
-                                  ? "#0f62fe"
-                                  : "#cce5ff"
-                                : emojiButtonStyle.background,
-                              borderColor: hasReacted(reactions, emoji)
-                                ? "#007bff"
-                                : "#ccc",
-                            }}
-                            onClick={() => addReaction(msg.id, emoji)}
-                          >
-                            {emoji}{" "}
-                            {getReactionCount(reactions, emoji) > 0
-                              ? getReactionCount(reactions, emoji)
-                              : ""}
-                          </span>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {typingUsers.length > 0 && (
-          <p style={{ fontStyle: "italic", marginBottom: 5 }}>
-            {typingUsers.join(", ")} is typing...
-          </p>
-        )}
-
-        <div style={inputAreaStyle}>
-          <input
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              setTyping(true);
-            }}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Type a message"
-            style={{
-              flex: "1 1 60%",
-              padding: 8,
-              borderRadius: 4,
-              border: "1px solid #ccc",
-            }}
-          />
-          <input type="file" onChange={handleFileChange} />
-          <button onClick={handleSend} disabled={uploading} style={buttonStyle}>
-            {uploading ? "Uploading..." : "Send"}
-          </button>
-        </div>
+        <button
+          onClick={handleSend}
+          style={{
+            padding: "6px 12px",
+            backgroundColor: darkMode ? "#0d6efd" : "#007bff",
+            color: "#fff",
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+          }}
+        >
+          Send
+        </button>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} />
       </div>
+
+      {uploadProgress > 0 && (
+        <div style={{ marginTop: 5 }}>Uploading: {uploadProgress}%...</div>
+      )}
+
+      {otherTypingUsers.length > 0 && (
+        <div
+          style={{
+            marginTop: 10,
+            fontStyle: "italic",
+            color: "#888",
+          }}
+        >
+          {otherTypingUsers.join(", ")}{" "}
+          {otherTypingUsers.length === 1 ? "is" : "are"} typing...
+        </div>
+      )}
     </div>
   );
 };

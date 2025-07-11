@@ -36,21 +36,23 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
+// In-memory stores
 const users = {}; // socket.id => { username, id }
-const userRooms = {}; // socket.id => room
+const userRooms = {}; // socket.id => current room
 const messages = {}; // room => [message]
 const typingUsers = {}; // room => { socketId: username }
 
+// Helpers
 const getUsersInRoom = (room) => {
   return Object.entries(users)
     .filter(([id]) => userRooms[id] === room)
     .map(([, user]) => user);
 };
 
-const getTypingUsersInRoom = (room) => {
-  return typingUsers[room] ? Object.values(typingUsers[room]) : [];
-};
+const getTypingUsersInRoom = (room) =>
+  typingUsers[room] ? Object.values(typingUsers[room]) : [];
 
+// Socket.io
 io.on("connection", (socket) => {
   console.log(`✅ User connected: ${socket.id}`);
 
@@ -60,23 +62,28 @@ io.on("connection", (socket) => {
     userRooms[socket.id] = room;
     socket.join(room);
 
-    if (!messages[room]) messages[room] = [];
-    if (!typingUsers[room]) typingUsers[room] = {};
+    messages[room] ||= [];
+    typingUsers[room] ||= {};
 
     io.to(room).emit("user_joined", { username, id: socket.id });
     io.to(room).emit("user_list", getUsersInRoom(room));
+    console.log(`${username} joined GLOBAL`);
   });
 
   socket.on("join_room", ({ username, room }) => {
     users[socket.id] = { username, id: socket.id };
+    const oldRoom = userRooms[socket.id];
+    if (oldRoom) socket.leave(oldRoom);
+
     userRooms[socket.id] = room;
     socket.join(room);
 
-    if (!messages[room]) messages[room] = [];
-    if (!typingUsers[room]) typingUsers[room] = {};
+    messages[room] ||= [];
+    typingUsers[room] ||= {};
 
     io.to(room).emit("user_joined", { username, id: socket.id });
     io.to(room).emit("user_list", getUsersInRoom(room));
+    console.log(`${username} joined room ${room}`);
   });
 
   socket.on("send_message", ({ message, room }) => {
@@ -91,9 +98,8 @@ io.on("connection", (socket) => {
       reactions: {},
     };
 
-    if (!messages[room]) messages[room] = [];
     messages[room].push(msg);
-    if (messages[room].length > 500) messages[room].shift(); // limit
+    if (messages[room].length > 100) messages[room].shift();
 
     io.to(room).emit("receive_message", msg);
   });
@@ -105,8 +111,8 @@ io.on("connection", (socket) => {
     const msg = roomMessages.find((m) => m.id === messageId);
     if (!msg) return;
 
-    if (!msg.reactions) msg.reactions = {};
-    if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+    msg.reactions ||= {};
+    msg.reactions[emoji] ||= [];
 
     const userId = socket.id;
     const userIndex = msg.reactions[emoji].indexOf(userId);
@@ -115,9 +121,7 @@ io.on("connection", (socket) => {
       msg.reactions[emoji].push(userId);
     } else {
       msg.reactions[emoji].splice(userIndex, 1);
-      if (msg.reactions[emoji].length === 0) {
-        delete msg.reactions[emoji];
-      }
+      if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
     }
 
     io.to(room).emit("receive_message", msg);
@@ -127,7 +131,7 @@ io.on("connection", (socket) => {
     const username = users[socket.id]?.username;
     if (!username) return;
 
-    if (!typingUsers[room]) typingUsers[room] = {};
+    typingUsers[room] ||= {};
 
     if (isTyping) {
       typingUsers[room][socket.id] = username;
@@ -146,6 +150,7 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Fixed private messaging logic here:
   socket.on("private_message", ({ to, message }) => {
     const fromUser = users[socket.id];
     const toSocketId = Object.keys(users).find(
@@ -165,18 +170,45 @@ io.on("connection", (socket) => {
       isPrivate: true,
       timestamp: new Date().toISOString(),
       readBy: [socket.id],
+      reactions: {},
     };
 
-    if (!messages[room]) messages[room] = [];
+    messages[room] ||= [];
     messages[room].push(privateMsg);
 
+    // Ensure sender leaves old room and joins private room
+    const oldRoom = userRooms[socket.id];
+    if (oldRoom && oldRoom !== room) socket.leave(oldRoom);
+
+    // Join private room for sender and recipient
     socket.join(room);
+    userRooms[socket.id] = room;
+
     const recipientSocket = io.sockets.sockets.get(toSocketId);
     if (recipientSocket) {
-      recipientSocket.join(room);
-    }
+      // Recipient joins private room too
+      const recipientOldRoom = userRooms[toSocketId];
+      if (recipientOldRoom && recipientOldRoom !== room)
+        recipientSocket.leave(recipientOldRoom);
 
-    io.to(room).emit("private_message", privateMsg);
+      recipientSocket.join(room);
+      userRooms[toSocketId] = room;
+
+      // Emit private message to entire private room
+      io.to(room).emit("private_message", privateMsg);
+
+      // Notify recipient if they're not currently in private room
+      if (recipientOldRoom !== room) {
+        recipientSocket.emit("notify_message", {
+          from: fromUser.username,
+          message,
+          room,
+        });
+      }
+    } else {
+      // Just emit to sender if recipient offline
+      socket.emit("private_message", privateMsg);
+    }
   });
 
   socket.on("disconnect", () => {
@@ -199,28 +231,17 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ Upload endpoint
+// File upload endpoint
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
   const fileUrl = `/uploads/${req.file.filename}`;
   res.json({ fileUrl });
 });
 
-// ✅ Message pagination endpoint
+// REST endpoints
 app.get("/api/messages/:room", (req, res) => {
   const room = req.params.room || "global";
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
-
-  const roomMessages = messages[room] || [];
-  const total = roomMessages.length;
-
-  const start = Math.max(total - page * limit, 0);
-  const end = total - (page - 1) * limit;
-
-  const paginated = roomMessages.slice(start, end);
-  res.json({ messages: paginated, total });
+  res.json(messages[room] || []);
 });
 
 app.get("/api/users/:room", (req, res) => {
@@ -232,6 +253,7 @@ app.get("/", (req, res) => {
   res.send("Socket.io Chat Server is running");
 });
 
+// Start Server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

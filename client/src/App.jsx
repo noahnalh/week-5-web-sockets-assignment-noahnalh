@@ -1,52 +1,77 @@
-// src/App.jsx
 import React, { useState } from "react";
 import { useSocket } from "./socket/socket";
 import ChatRoom from "./pages/ChatRoom";
-import Sidebar from "./components/Sidebar";
 
 const App = () => {
   const [username, setUsername] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentRoom, setCurrentRoom] = useState("global");
   const [darkMode, setDarkMode] = useState(false);
 
-  const { connect, isConnected, users, joinRoom, unreadCounts } = useSocket();
+  const { connect, isConnected, users, joinRoom, unreadCounts, currentRoom } =
+    useSocket();
 
   const handleLogin = () => {
-    if (username.trim()) {
-      connect(username);
-      joinRoom(username, "global");
-      setIsLoggedIn(true);
-    }
+    if (!username.trim()) return;
+    connect(username);
+    joinRoom(username, "global");
+    setIsLoggedIn(true);
   };
 
   const handleRoomJoin = (room) => {
     joinRoom(username, room);
-    setCurrentRoom(room);
   };
 
   const pageStyle = {
     backgroundColor: darkMode ? "#121212" : "#f4f4f4",
     color: darkMode ? "#f0f0f0" : "#000",
     minHeight: "100vh",
-    padding: 20,
-    paddingLeft: isLoggedIn ? 260 : 20, // Account for sidebar
+    display: "flex",
+    flexDirection: "column",
   };
+
+  const layoutStyle = {
+    display: "flex",
+    flex: 1,
+    flexDirection: "row",
+    minHeight: "90vh",
+  };
+
+  const sidebarStyle = {
+    width: 200,
+    padding: 10,
+    borderRight: darkMode ? "1px solid #333" : "1px solid #ccc",
+    background: darkMode ? "#1a1a1a" : "#fafafa",
+  };
+
+  const chatContainerStyle = {
+    flex: 1,
+    padding: 10,
+  };
+
+  const buttonStyle = (active) => ({
+    display: "block",
+    marginBottom: 8,
+    width: "100%",
+    textAlign: "left",
+    padding: 8,
+    borderRadius: 4,
+    background: active
+      ? darkMode
+        ? "#333"
+        : "#e0e0e0"
+      : darkMode
+      ? "#222"
+      : "#fff",
+    color: darkMode ? "#fff" : "#000",
+    border: "1px solid #ccc",
+    cursor: "pointer",
+  });
 
   return (
     <div style={pageStyle}>
-      {isLoggedIn && (
-        <Sidebar
-          users={users}
-          username={username}
-          currentRoom={currentRoom}
-          onRoomSelect={handleRoomJoin}
-        />
-      )}
-
-      <div style={{ maxWidth: 600, margin: "0 auto" }}>
+      <div style={{ padding: 10 }}>
         <button
-          onClick={() => setDarkMode((prev) => !prev)}
+          onClick={() => setDarkMode((d) => !d)}
           style={{
             marginBottom: 10,
             padding: "5px 10px",
@@ -59,31 +84,72 @@ const App = () => {
         >
           {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
         </button>
+      </div>
 
-        {!isLoggedIn ? (
-          <div>
-            <h2>Enter Username</h2>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <button onClick={handleLogin} style={{ marginLeft: 10 }}>
-              Join
+      {!isLoggedIn ? (
+        <div style={{ padding: 20 }}>
+          <h2>Enter Username</h2>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{ padding: 6 }}
+            placeholder="Your username"
+          />
+          <button onClick={handleLogin} style={{ marginLeft: 10, padding: 6 }}>
+            Join
+          </button>
+        </div>
+      ) : (
+        <div style={layoutStyle}>
+          {/* Sidebar */}
+          <div style={sidebarStyle}>
+            <h3>Rooms</h3>
+
+            {/* Global room */}
+            <button
+              style={buttonStyle(currentRoom === "global")}
+              onClick={() => handleRoomJoin("global")}
+            >
+              🌐 Global Chat{" "}
+              {unreadCounts["global"] > 0 && (
+                <span style={{ color: "red" }}>({unreadCounts["global"]})</span>
+              )}
             </button>
+
+            {/* Private rooms - each user except self */}
+            {users
+              .filter((u) => u.username !== username)
+              .map((user) => {
+                const roomId = [username, user.username].sort().join("_");
+                return (
+                  <button
+                    key={user.id}
+                    onClick={() => handleRoomJoin(roomId)}
+                    style={buttonStyle(currentRoom === roomId)}
+                  >
+                    💬 {user.username}{" "}
+                    {unreadCounts[roomId] > 0 && (
+                      <span style={{ color: "red" }}>
+                        ({unreadCounts[roomId]})
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
           </div>
-        ) : (
-          <div>
+
+          {/* Chat area */}
+          <div style={chatContainerStyle}>
             <h2>Welcome, {username}</h2>
             <p>Status: {isConnected ? "🟢 Connected" : "🔴 Disconnected"}</p>
-
             <h3>
               Current Room:{" "}
               {currentRoom === "global"
                 ? "🌐 Global Chat"
-                : `💬 Chat with ${
-                    users.find((u) => u.id === currentRoom)?.username ||
-                    "Private"
-                  }`}
+                : `💬 Chat with ${currentRoom
+                    .replace(username, "")
+                    .replace("_", "")
+                    .trim()}`}
             </h3>
 
             <ChatRoom
@@ -92,8 +158,8 @@ const App = () => {
               darkMode={darkMode}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
