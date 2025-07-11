@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../socket/socket";
 
+const EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
+
 const ChatRoom = ({ username, room, darkMode }) => {
   const {
     messages,
@@ -11,6 +13,7 @@ const ChatRoom = ({ username, room, darkMode }) => {
     joinRoom,
     setTyping,
     markMessageAsRead,
+    addReaction,
   } = useSocket();
 
   const [message, setMessage] = useState("");
@@ -107,49 +110,69 @@ const ChatRoom = ({ username, room, darkMode }) => {
     alignItems: "center",
   };
 
+  const chatBoxStyle = {
+    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+    border: "1px solid #ccc",
+    borderRadius: 10,
+    padding: 15,
+    width: "100%",
+    maxWidth: "600px",
+    height: "80vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+  };
 
- const chatBoxStyle = {
-   backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-   border: "1px solid #ccc",
-   borderRadius: 10,
-   padding: 15,
-   width: "100%",
-   maxWidth: "600px",
-   height: "80vh", // Controlled height
-   maxHeight: "80vh",
-   display: "flex",
-   flexDirection: "column",
-   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
- };
+  const messageAreaStyle = {
+    flex: 1,
+    overflowY: "auto",
+    marginBottom: 10,
+    padding: 5,
+    backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
+    borderRadius: 6,
+  };
 
+  const inputAreaStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+  };
 
- const messageAreaStyle = {
-   flex: 1,
-   overflowY: "auto",
-   marginBottom: 10,
-   padding: 5,
-   backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
-   borderRadius: 6,
- };
+  const buttonStyle = {
+    padding: "8px 14px",
+    borderRadius: 4,
+    border: "none",
+    cursor: "pointer",
+    backgroundColor: uploading ? "#888" : "#007bff",
+    color: "#fff",
+    fontWeight: "bold",
+    flexShrink: 0,
+  };
 
-const inputAreaStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-};
+  const emojiBarStyle = {
+    marginTop: 4,
+    display: "flex",
+    gap: 6,
+    flexWrap: "wrap",
+  };
 
+  const emojiButtonStyle = {
+    cursor: "pointer",
+    padding: "2px 6px",
+    borderRadius: 4,
+    border: "1px solid #ccc",
+    background: darkMode ? "#333" : "#eee",
+    fontSize: "1rem",
+  };
 
-const buttonStyle = {
-  padding: "8px 14px",
-  borderRadius: 4,
-  border: "none",
-  cursor: "pointer",
-  backgroundColor: uploading ? "#888" : "#007bff",
-  color: "#fff",
-  fontWeight: "bold",
-  flexShrink: 0,
-};
+  const getReactionCount = (reactions = {}, emoji) => {
+    return reactions[emoji]?.length || 0;
+  };
 
+  const hasReacted = (reactions = {}, emoji) => {
+    const userId = username;
+    return reactions[emoji]?.includes(userId);
+  };
 
   return (
     <div style={containerStyle}>
@@ -157,20 +180,51 @@ const buttonStyle = {
         <div style={messageAreaStyle}>
           {messages
             .filter((msg) => msg.room === room || msg.isPrivate)
-            .map((msg, i) => (
-              <div key={i} style={{ marginBottom: 6 }}>
-                {msg.system ? (
-                  <em>{msg.message}</em>
-                ) : (
-                  <p style={{ margin: 0 }}>
-                    <strong>{msg.sender}:</strong> {renderMessage(msg)} ·{" "}
-                    <small>
-                      {msg.readBy?.length}/{users.length} read
-                    </small>
-                  </p>
-                )}
-              </div>
-            ))}
+            .map((msg, i) => {
+              const reactions = msg.reactions || {};
+              return (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {msg.system ? (
+                    <em>{msg.message}</em>
+                  ) : (
+                    <>
+                      <p style={{ margin: 0 }}>
+                        <strong>{msg.sender}:</strong> {renderMessage(msg)} ·{" "}
+                        <small>
+                          {msg.readBy?.length}/{users.length} read
+                        </small>
+                      </p>
+
+                      {/* ✅ Emoji Reactions */}
+                      <div style={emojiBarStyle}>
+                        {EMOJIS.map((emoji) => (
+                          <span
+                            key={emoji}
+                            style={{
+                              ...emojiButtonStyle,
+                              backgroundColor: hasReacted(reactions, emoji)
+                                ? darkMode
+                                  ? "#0f62fe"
+                                  : "#cce5ff"
+                                : emojiButtonStyle.background,
+                              borderColor: hasReacted(reactions, emoji)
+                                ? "#007bff"
+                                : "#ccc",
+                            }}
+                            onClick={() => addReaction(msg.id, emoji)}
+                          >
+                            {emoji}{" "}
+                            {getReactionCount(reactions, emoji) > 0
+                              ? getReactionCount(reactions, emoji)
+                              : ""}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           <div ref={messagesEndRef} />
         </div>
 

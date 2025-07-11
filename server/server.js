@@ -101,11 +101,41 @@ io.on("connection", (socket) => {
       room,
       readBy: [socket.id],
       timestamp: new Date().toISOString(),
+      reactions: {}, // ✅ Add empty reactions object
     };
 
     messages[room].push(msg);
     if (messages[room].length > 100) messages[room].shift();
 
+    io.to(room).emit("receive_message", msg);
+  });
+
+  // ✅ Emoji Reaction Handler (toggle logic)
+  socket.on("add_reaction", ({ messageId, emoji, room }) => {
+    const roomMessages = messages[room];
+    if (!roomMessages) return;
+
+    const msg = roomMessages.find((m) => m.id === messageId);
+    if (!msg) return;
+
+    if (!msg.reactions) msg.reactions = {};
+    if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+
+    const userId = socket.id;
+    const userIndex = msg.reactions[emoji].indexOf(userId);
+
+    if (userIndex === -1) {
+      // Add reaction
+      msg.reactions[emoji].push(userId);
+    } else {
+      // Remove reaction
+      msg.reactions[emoji].splice(userIndex, 1);
+      if (msg.reactions[emoji].length === 0) {
+        delete msg.reactions[emoji];
+      }
+    }
+
+    // Broadcast updated message with new reactions
     io.to(room).emit("receive_message", msg);
   });
 

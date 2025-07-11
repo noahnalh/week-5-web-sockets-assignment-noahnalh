@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useSocket } from "./socket/socket";
 import ChatRoom from "./pages/ChatRoom";
+import Sidebar from "./components/Sidebar";
 
 const App = () => {
   const [username, setUsername] = useState("");
