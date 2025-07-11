@@ -1,3 +1,4 @@
+// src/socket/socket.js
 import { io } from "socket.io-client";
 import { useEffect, useState, useRef } from "react";
 
@@ -31,7 +32,7 @@ export const useSocket = () => {
     usernameRef.current = username;
     roomRef.current = room;
     setCurrentRoom(room);
-    setMessages([]);
+    setMessages([]); // Clear messages when switching rooms
     setUnreadCounts((prev) => ({ ...prev, [room]: 0 }));
 
     if (room === "global") {
@@ -42,21 +43,29 @@ export const useSocket = () => {
   };
 
   const sendMessage = (message, room) => {
-    if (typeof message === "string") {
+    const isPrivate = room.includes("_");
+    if (isPrivate) {
+      const otherUsername = room
+        .split("_")
+        .find((u) => u !== usernameRef.current);
+      socket.emit("private_message", { to: otherUsername, message });
+    } else {
       socket.emit("send_message", { message, room });
     }
   };
 
-  const sendPrivateMessage = (to, message) => {
-    socket.emit("private_message", { to, message });
-  };
-
   const setTyping = (isTyping) => {
-    socket.emit("typing", { isTyping, room: roomRef.current });
+    socket.emit("typing", {
+      isTyping,
+      room: roomRef.current,
+    });
   };
 
   const markMessageAsRead = (messageId) => {
-    socket.emit("message_read", { messageId, room: roomRef.current });
+    socket.emit("message_read", {
+      messageId,
+      room: roomRef.current,
+    });
   };
 
   const addReaction = (messageId, emoji) => {
@@ -69,11 +78,7 @@ export const useSocket = () => {
   };
 
   const handleIncomingMessage = (message) => {
-    const currentUsername = usernameRef.current;
-    const room = roomRef.current;
-
     setLastMessage(message);
-
     setMessages((prev) => {
       const exists = prev.find((m) => m.id === message.id);
       return exists
@@ -81,21 +86,12 @@ export const useSocket = () => {
         : [...prev, message];
     });
 
-    // ✅ Handle unread count if message is not in current room
     const incomingRoom = message.room;
-
-    if (incomingRoom !== room) {
+    if (incomingRoom !== roomRef.current) {
       setUnreadCounts((prev) => ({
         ...prev,
         [incomingRoom]: (prev[incomingRoom] || 0) + 1,
       }));
-
-      // ✅ Optional: show system notification or browser alert here
-      // if (Notification.permission === "granted") {
-      //   new Notification(`New message from ${message.sender}`, {
-      //     body: message.message,
-      //   });
-      // }
     }
   };
 
@@ -114,9 +110,7 @@ export const useSocket = () => {
       }
     };
 
-    const handleDisconnect = () => {
-      setIsConnected(false);
-    };
+    const handleDisconnect = () => setIsConnected(false);
 
     const handleMessageRead = ({ messageId, readerId }) => {
       setMessages((prev) =>
@@ -137,9 +131,7 @@ export const useSocket = () => {
       );
     };
 
-    const handleUserList = (list) => {
-      setUsers(list);
-    };
+    const handleUserList = (list) => setUsers(list);
 
     const handleUserJoined = (user) => {
       setMessages((prev) => [
@@ -169,11 +161,10 @@ export const useSocket = () => {
       setTypingUsers(usersTyping);
     };
 
-    // Register socket events
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("receive_message", handleIncomingMessage);
-    socket.on("private_message", handleIncomingMessage); // ✅ same handler
+    socket.on("private_message", handleIncomingMessage);
     socket.on("message_read", handleMessageRead);
     socket.on("message_updated", handleMessageUpdated);
     socket.on("user_list", handleUserList);
@@ -206,11 +197,10 @@ export const useSocket = () => {
     connect,
     joinRoom,
     sendMessage,
-    sendPrivateMessage,
     setTyping,
     markMessageAsRead,
     addReaction,
-    unreadCounts, // ✅ expose unread counts per room
+    unreadCounts,
   };
 };
 

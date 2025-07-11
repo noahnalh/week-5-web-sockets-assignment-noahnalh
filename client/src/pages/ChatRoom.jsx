@@ -20,6 +20,7 @@ const ChatRoom = ({ username, room, darkMode }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef();
+  const audioRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,6 +39,28 @@ const ChatRoom = ({ username, room, darkMode }) => {
       }
     });
   }, [messages, room]);
+
+  // Sound and browser notification
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (last && last.sender !== username && last.room === room) {
+      if (audioRef.current) audioRef.current.play();
+
+      if (Notification.permission === "granted") {
+        new Notification(`💬 ${last.sender}`, {
+          body: last.message,
+        });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            new Notification(`💬 ${last.sender}`, {
+              body: last.message,
+            });
+          }
+        });
+      }
+    }
+  }, [messages]);
 
   const handleSend = async () => {
     if (!message.trim() && !selectedFile) return;
@@ -98,6 +121,14 @@ const ChatRoom = ({ username, room, darkMode }) => {
     } else {
       return JSON.stringify(msg.message);
     }
+  };
+
+  const getReactionCount = (reactions = {}, emoji) => {
+    return reactions[emoji]?.length || 0;
+  };
+
+  const hasReacted = (reactions = {}, emoji) => {
+    return reactions[emoji]?.includes(username);
   };
 
   const containerStyle = {
@@ -165,21 +196,13 @@ const ChatRoom = ({ username, room, darkMode }) => {
     fontSize: "1rem",
   };
 
-  const getReactionCount = (reactions = {}, emoji) => {
-    return reactions[emoji]?.length || 0;
-  };
-
-  const hasReacted = (reactions = {}, emoji) => {
-    const userId = username;
-    return reactions[emoji]?.includes(userId);
-  };
-
   return (
     <div style={containerStyle}>
+      <audio ref={audioRef} src="/notify.mp3" preload="auto" />
       <div style={chatBoxStyle}>
         <div style={messageAreaStyle}>
           {messages
-            .filter((msg) => msg.room === room) // ✅ only show messages for this room
+            .filter((msg) => msg.room === room)
             .map((msg, i) => {
               const reactions = msg.reactions || {};
               return (
@@ -229,7 +252,8 @@ const ChatRoom = ({ username, room, darkMode }) => {
 
         {typingUsers.length > 0 && (
           <p style={{ fontStyle: "italic", marginBottom: 5 }}>
-            {typingUsers.join(", ")} is typing...
+            {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"}{" "}
+            typing...
           </p>
         )}
 

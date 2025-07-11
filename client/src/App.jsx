@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// src/App.jsx
+import React, { useEffect, useState } from "react";
 import { useSocket } from "./socket/socket";
 import ChatRoom from "./pages/ChatRoom";
 
@@ -13,7 +14,8 @@ const App = () => {
     isConnected,
     users,
     joinRoom,
-    unreadCounts, // ✅ pull in unread count
+    unreadCounts,
+    currentRoom: activeRoom,
   } = useSocket();
 
   const handleLogin = () => {
@@ -24,9 +26,9 @@ const App = () => {
     }
   };
 
-  const handleRoomJoin = (room) => {
-    joinRoom(username, room);
-    setCurrentRoom(room);
+  const handleRoomJoin = (roomId) => {
+    joinRoom(username, roomId);
+    setCurrentRoom(roomId);
   };
 
   const pageStyle = {
@@ -81,34 +83,22 @@ const App = () => {
             </h3>
 
             <div style={{ marginBottom: 10 }}>
-              {/* Global Room Button */}
               <button onClick={() => handleRoomJoin("global")}>
                 🌐 Global Chat{" "}
-                {unreadCounts["global"] > 0 && (
-                  <span style={{ color: "red" }}>
-                    ({unreadCounts["global"]})
-                  </span>
-                )}
+                {unreadCounts["global"] > 0 && `(${unreadCounts["global"]})`}
               </button>
-
-              {/* Private Chat Buttons */}
               {users
                 .filter((u) => u.username !== username)
                 .map((user) => {
-                  const roomKey = [username, user.username].sort().join("_");
-
+                  const roomId = [username, user.username].sort().join("_");
                   return (
                     <button
                       key={user.id}
-                      onClick={() => handleRoomJoin(roomKey)}
+                      onClick={() => handleRoomJoin(roomId)}
                       style={{ marginLeft: 5 }}
                     >
                       💬 Chat with {user.username}{" "}
-                      {unreadCounts[roomKey] > 0 && (
-                        <span style={{ color: "red" }}>
-                          ({unreadCounts[roomKey]})
-                        </span>
-                      )}
+                      {unreadCounts[roomId] > 0 && `(${unreadCounts[roomId]})`}
                     </button>
                   );
                 })}
