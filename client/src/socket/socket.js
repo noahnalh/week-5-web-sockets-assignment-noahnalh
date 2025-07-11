@@ -34,6 +34,7 @@ export const useSocket = () => {
     setCurrentRoom(room);
     setMessages([]); // Reset current room messages
     setUnreadCounts((prev) => ({ ...prev, [room]: 0 })); // ✅ Reset unread
+
     if (room === "global") {
       socket.emit("user_join", username);
     } else {
@@ -47,13 +48,8 @@ export const useSocket = () => {
     }
   };
 
-  const addReaction = (messageId, emoji) => {
-    socket.emit("add_reaction", {
-      messageId,
-      emoji,
-      room: roomRef.current,
-      username: usernameRef.current,
-    });
+  const sendPrivateMessage = (to, message) => {
+    socket.emit("private_message", { to, message });
   };
 
   const setTyping = (isTyping) => {
@@ -64,48 +60,51 @@ export const useSocket = () => {
     socket.emit("message_read", { messageId, room: roomRef.current });
   };
 
-  const sendPrivateMessage = (to, message) => {
-    socket.emit("private_message", { to, message });
+  const addReaction = (messageId, emoji) => {
+    socket.emit("add_reaction", {
+      messageId,
+      emoji,
+      room: roomRef.current,
+      username: usernameRef.current,
+    });
+  };
+
+  // Handle incoming messages
+  const handleIncomingMessage = (message) => {
+    setLastMessage(message);
+    setMessages((prev) => {
+      const exists = prev.find((m) => m.id === message.id);
+      return exists
+        ? prev.map((m) => (m.id === message.id ? message : m))
+        : [...prev, message];
+    });
+
+    const incomingRoom = message.room;
+
+    if (incomingRoom !== roomRef.current) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [incomingRoom]: (prev[incomingRoom] || 0) + 1,
+      }));
+    }
   };
 
   useEffect(() => {
     const handleConnect = () => {
       setIsConnected(true);
-      if (usernameRef.current) {
-        const username = usernameRef.current;
-        const room = roomRef.current;
-        room === "global"
-          ? socket.emit("user_join", username)
-          : socket.emit("join_room", { username, room });
+      const username = usernameRef.current;
+      const room = roomRef.current;
+
+      if (username) {
+        if (room === "global") {
+          socket.emit("user_join", username);
+        } else {
+          socket.emit("join_room", { username, room });
+        }
       }
     };
 
     const handleDisconnect = () => setIsConnected(false);
-
-    const handleReceiveMessage = (message) => {
-      setLastMessage(message);
-      setMessages((prev) => {
-        const exists = prev.find((m) => m.id === message.id);
-        if (exists) {
-          return prev.map((m) => (m.id === message.id ? message : m));
-        } else {
-          return [...prev, message];
-        }
-      });
-
-      // ✅ Increment unread count if not in current room
-      if (message.room !== roomRef.current && !message.isPrivate) {
-        setUnreadCounts((prev) => ({
-          ...prev,
-          [message.room]: (prev[message.room] || 0) + 1,
-        }));
-      }
-    };
-
-    const handlePrivateMessage = (message) => {
-      setLastMessage(message);
-      setMessages((prev) => [...prev, message]);
-    };
 
     const handleMessageRead = ({ messageId, readerId }) => {
       setMessages((prev) =>
@@ -156,10 +155,11 @@ export const useSocket = () => {
       setTypingUsers(usersTyping);
     };
 
+    // Register events
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
-    socket.on("receive_message", handleReceiveMessage);
-    socket.on("private_message", handlePrivateMessage);
+    socket.on("receive_message", handleIncomingMessage);
+    socket.on("private_message", handleIncomingMessage); // ✅ same handler
     socket.on("message_read", handleMessageRead);
     socket.on("message_updated", handleMessageUpdated);
     socket.on("user_list", handleUserList);
@@ -170,8 +170,8 @@ export const useSocket = () => {
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
-      socket.off("receive_message", handleReceiveMessage);
-      socket.off("private_message", handlePrivateMessage);
+      socket.off("receive_message", handleIncomingMessage);
+      socket.off("private_message", handleIncomingMessage); // ✅ cleanup
       socket.off("message_read", handleMessageRead);
       socket.off("message_updated", handleMessageUpdated);
       socket.off("user_list", handleUserList);

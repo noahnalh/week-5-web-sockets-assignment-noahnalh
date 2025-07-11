@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useSocket } from "./socket/socket";
 import ChatRoom from "./pages/ChatRoom";
-import Sidebar from "./components/Sidebar";
 
 const App = () => {
   const [username, setUsername] = useState("");
@@ -19,9 +18,14 @@ const App = () => {
     }
   };
 
-  const handleRoomJoin = (room) => {
-    joinRoom(username, room);
-    setCurrentRoom(room);
+  // ✅ Fix: Use usernames to form consistent private room names
+  const handleRoomJoin = (targetUsername) => {
+    const privateRoom =
+      targetUsername === "global"
+        ? "global"
+        : [username, targetUsername].sort().join("_");
+    joinRoom(username, privateRoom);
+    setCurrentRoom(privateRoom);
   };
 
   const pageStyle = {
@@ -69,10 +73,7 @@ const App = () => {
               Current Room:{" "}
               {currentRoom === "global"
                 ? "🌐 Global Chat"
-                : `💬 Chat with ${
-                    users.find((u) => u.id === currentRoom)?.username ||
-                    "Private"
-                  }`}
+                : `💬 Private Chat: ${currentRoom.replaceAll("_", " vs ")}`}
             </h3>
 
             <div style={{ marginBottom: 10 }}>
@@ -84,7 +85,7 @@ const App = () => {
                 .map((user) => (
                   <button
                     key={user.id}
-                    onClick={() => handleRoomJoin(user.id)}
+                    onClick={() => handleRoomJoin(user.username)} // ✅ Fix here
                     style={{ marginLeft: 5 }}
                   >
                     💬 Chat with {user.username}

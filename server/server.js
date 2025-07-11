@@ -101,7 +101,7 @@ io.on("connection", (socket) => {
       room,
       readBy: [socket.id],
       timestamp: new Date().toISOString(),
-      reactions: {}, // ✅ Add empty reactions object
+      reactions: {},
     };
 
     messages[room].push(msg);
@@ -110,7 +110,7 @@ io.on("connection", (socket) => {
     io.to(room).emit("receive_message", msg);
   });
 
-  // ✅ Emoji Reaction Handler (toggle logic)
+  // Emoji Reaction Handler
   socket.on("add_reaction", ({ messageId, emoji, room }) => {
     const roomMessages = messages[room];
     if (!roomMessages) return;
@@ -125,17 +125,14 @@ io.on("connection", (socket) => {
     const userIndex = msg.reactions[emoji].indexOf(userId);
 
     if (userIndex === -1) {
-      // Add reaction
       msg.reactions[emoji].push(userId);
     } else {
-      // Remove reaction
       msg.reactions[emoji].splice(userIndex, 1);
       if (msg.reactions[emoji].length === 0) {
         delete msg.reactions[emoji];
       }
     }
 
-    // Broadcast updated message with new reactions
     io.to(room).emit("receive_message", msg);
   });
 
@@ -164,20 +161,40 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Private message
+  // ✅ Private messaging (fixed)
   socket.on("private_message", ({ to, message }) => {
+    const fromUser = users[socket.id];
+    const toSocketId = Object.keys(users).find(
+      (id) => users[id].username === to
+    );
+
+    if (!fromUser || !toSocketId) return;
+
+    const room = [fromUser.username, to].sort().join("_");
+
     const privateMsg = {
       id: Date.now(),
-      sender: users[socket.id]?.username || "Anonymous",
+      sender: fromUser.username,
       senderId: socket.id,
       message,
+      room,
       isPrivate: true,
       timestamp: new Date().toISOString(),
-      readBy: [],
+      readBy: [socket.id],
     };
 
-    socket.to(to).emit("private_message", privateMsg);
-    socket.emit("private_message", privateMsg);
+    if (!messages[room]) messages[room] = [];
+    messages[room].push(privateMsg);
+
+    // Join the private room
+    socket.join(room);
+    const recipientSocket = io.sockets.sockets.get(toSocketId);
+    if (recipientSocket) {
+      recipientSocket.join(room);
+    }
+
+    // Emit to the private room (both users will receive)
+    io.to(room).emit("private_message", privateMsg);
   });
 
   // Disconnect
@@ -201,7 +218,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ File upload endpoint
+// File upload endpoint
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 

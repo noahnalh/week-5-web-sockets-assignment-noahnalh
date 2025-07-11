@@ -179,7 +179,7 @@ const ChatRoom = ({ username, room, darkMode }) => {
       <div style={chatBoxStyle}>
         <div style={messageAreaStyle}>
           {messages
-            .filter((msg) => msg.room === room || msg.isPrivate)
+            .filter((msg) => msg.room === room) // ✅ only show messages for this room
             .map((msg, i) => {
               const reactions = msg.reactions || {};
               return (
@@ -195,7 +195,6 @@ const ChatRoom = ({ username, room, darkMode }) => {
                         </small>
                       </p>
 
-                      {/* ✅ Emoji Reactions */}
                       <div style={emojiBarStyle}>
                         {EMOJIS.map((emoji) => (
                           <span
