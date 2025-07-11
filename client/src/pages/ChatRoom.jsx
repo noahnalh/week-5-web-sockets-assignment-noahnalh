@@ -101,46 +101,55 @@ const ChatRoom = ({ username, room, darkMode }) => {
     backgroundColor: darkMode ? "#121212" : "#f4f4f4",
     color: darkMode ? "#e0e0e0" : "#000",
     minHeight: "100vh",
-    padding: 10,
+    padding: "20px 10px",
     display: "flex",
     justifyContent: "center",
+    alignItems: "center",
   };
 
-  const chatBoxStyle = {
-    backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
-    border: "1px solid #ccc",
-    borderRadius: 8,
-    padding: 10,
-    width: "100%",
-    maxWidth: 600,
-    display: "flex",
-    flexDirection: "column",
-    height: "90vh",
-  };
 
-  const messageAreaStyle = {
-    flex: 1,
-    overflowY: "auto",
-    marginBottom: 10,
-    padding: 5,
-  };
+ const chatBoxStyle = {
+   backgroundColor: darkMode ? "#1e1e1e" : "#ffffff",
+   border: "1px solid #ccc",
+   borderRadius: 10,
+   padding: 15,
+   width: "100%",
+   maxWidth: "600px",
+   height: "80vh", // Controlled height
+   maxHeight: "80vh",
+   display: "flex",
+   flexDirection: "column",
+   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+ };
 
-  const inputAreaStyle = {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 5,
-  };
 
-  const buttonStyle = {
-    padding: "8px 14px",
-    borderRadius: 4,
-    border: "none",
-    cursor: "pointer",
-    backgroundColor: uploading ? "#999" : "#007bff",
-    color: "#fff",
-    fontWeight: "bold",
-    transition: "background-color 0.3s",
-  };
+ const messageAreaStyle = {
+   flex: 1,
+   overflowY: "auto",
+   marginBottom: 10,
+   padding: 5,
+   backgroundColor: darkMode ? "#2a2a2a" : "#fafafa",
+   borderRadius: 6,
+ };
+
+const inputAreaStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+};
+
+
+const buttonStyle = {
+  padding: "8px 14px",
+  borderRadius: 4,
+  border: "none",
+  cursor: "pointer",
+  backgroundColor: uploading ? "#888" : "#007bff",
+  color: "#fff",
+  fontWeight: "bold",
+  flexShrink: 0,
+};
+
 
   return (
     <div style={containerStyle}>
