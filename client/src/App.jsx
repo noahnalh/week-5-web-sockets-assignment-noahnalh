@@ -1,7 +1,8 @@
 // src/App.jsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useSocket } from "./socket/socket";
 import ChatRoom from "./pages/ChatRoom";
+import Sidebar from "./components/Sidebar";
 
 const App = () => {
   const [username, setUsername] = useState("");
@@ -9,14 +10,7 @@ const App = () => {
   const [currentRoom, setCurrentRoom] = useState("global");
   const [darkMode, setDarkMode] = useState(false);
 
-  const {
-    connect,
-    isConnected,
-    users,
-    joinRoom,
-    unreadCounts,
-    currentRoom: activeRoom,
-  } = useSocket();
+  const { connect, isConnected, users, joinRoom, unreadCounts } = useSocket();
 
   const handleLogin = () => {
     if (username.trim()) {
@@ -26,9 +20,9 @@ const App = () => {
     }
   };
 
-  const handleRoomJoin = (roomId) => {
-    joinRoom(username, roomId);
-    setCurrentRoom(roomId);
+  const handleRoomJoin = (room) => {
+    joinRoom(username, room);
+    setCurrentRoom(room);
   };
 
   const pageStyle = {
@@ -36,10 +30,20 @@ const App = () => {
     color: darkMode ? "#f0f0f0" : "#000",
     minHeight: "100vh",
     padding: 20,
+    paddingLeft: isLoggedIn ? 260 : 20, // Account for sidebar
   };
 
   return (
     <div style={pageStyle}>
+      {isLoggedIn && (
+        <Sidebar
+          users={users}
+          username={username}
+          currentRoom={currentRoom}
+          onRoomSelect={handleRoomJoin}
+        />
+      )}
+
       <div style={{ maxWidth: 600, margin: "0 auto" }}>
         <button
           onClick={() => setDarkMode((prev) => !prev)}
@@ -81,28 +85,6 @@ const App = () => {
                     "Private"
                   }`}
             </h3>
-
-            <div style={{ marginBottom: 10 }}>
-              <button onClick={() => handleRoomJoin("global")}>
-                🌐 Global Chat{" "}
-                {unreadCounts["global"] > 0 && `(${unreadCounts["global"]})`}
-              </button>
-              {users
-                .filter((u) => u.username !== username)
-                .map((user) => {
-                  const roomId = [username, user.username].sort().join("_");
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => handleRoomJoin(roomId)}
-                      style={{ marginLeft: 5 }}
-                    >
-                      💬 Chat with {user.username}{" "}
-                      {unreadCounts[roomId] > 0 && `(${unreadCounts[roomId]})`}
-                    </button>
-                  );
-                })}
-            </div>
 
             <ChatRoom
               username={username}

@@ -1,4 +1,3 @@
-// src/socket/socket.js
 import { io } from "socket.io-client";
 import { useEffect, useState, useRef } from "react";
 
@@ -19,53 +18,51 @@ export const useSocket = () => {
   const [typingUsers, setTypingUsers] = useState([]);
   const [currentRoom, setCurrentRoom] = useState("global");
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [totalMessages, setTotalMessages] = useState(0);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const usernameRef = useRef("");
   const roomRef = useRef("global");
+  const currentPageRef = useRef(1);
 
   const connect = (username) => {
     usernameRef.current = username;
     socket.connect();
   };
 
-  const joinRoom = (username, room = "global") => {
+  const joinRoom = async (username, room = "global") => {
     usernameRef.current = username;
     roomRef.current = room;
     setCurrentRoom(room);
-    setMessages([]); // Clear messages when switching rooms
+    setMessages([]);
     setUnreadCounts((prev) => ({ ...prev, [room]: 0 }));
+    currentPageRef.current = 1;
 
     if (room === "global") {
       socket.emit("user_join", username);
     } else {
       socket.emit("join_room", { username, room });
     }
+
+    await fetchMessages(room, 1);
   };
 
   const sendMessage = (message, room) => {
-    const isPrivate = room.includes("_");
-    if (isPrivate) {
-      const otherUsername = room
-        .split("_")
-        .find((u) => u !== usernameRef.current);
-      socket.emit("private_message", { to: otherUsername, message });
-    } else {
+    if (typeof message === "string") {
       socket.emit("send_message", { message, room });
     }
   };
 
+  const sendPrivateMessage = (to, message) => {
+    socket.emit("private_message", { to, message });
+  };
+
   const setTyping = (isTyping) => {
-    socket.emit("typing", {
-      isTyping,
-      room: roomRef.current,
-    });
+    socket.emit("typing", { isTyping, room: roomRef.current });
   };
 
   const markMessageAsRead = (messageId) => {
-    socket.emit("message_read", {
-      messageId,
-      room: roomRef.current,
-    });
+    socket.emit("message_read", { messageId, room: roomRef.current });
   };
 
   const addReaction = (messageId, emoji) => {
@@ -75,6 +72,32 @@ export const useSocket = () => {
       room: roomRef.current,
       username: usernameRef.current,
     });
+  };
+
+  // ✅ Fetch paginated messages from REST API
+  const fetchMessages = async (room, page = 1, limit = 20) => {
+    try {
+      setIsLoadingMessages(true);
+      const res = await fetch(
+        `${SOCKET_URL}/api/messages/${room}?page=${page}&limit=${limit}`
+      );
+      const data = await res.json();
+      setMessages((prev) => [...data.messages, ...prev]);
+      setTotalMessages(data.total);
+      currentPageRef.current = page;
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const loadOlderMessages = () => {
+    if (isLoadingMessages) return;
+    const nextPage = currentPageRef.current + 1;
+    if (messages.length < totalMessages) {
+      fetchMessages(roomRef.current, nextPage);
+    }
   };
 
   const handleIncomingMessage = (message) => {
@@ -107,6 +130,7 @@ export const useSocket = () => {
         } else {
           socket.emit("join_room", { username, room });
         }
+        fetchMessages(room, 1);
       }
     };
 
@@ -161,6 +185,7 @@ export const useSocket = () => {
       setTypingUsers(usersTyping);
     };
 
+    // Register socket events
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("receive_message", handleIncomingMessage);
@@ -197,10 +222,15 @@ export const useSocket = () => {
     connect,
     joinRoom,
     sendMessage,
+    sendPrivateMessage,
     setTyping,
     markMessageAsRead,
     addReaction,
     unreadCounts,
+    fetchMessages, // ✅
+    loadOlderMessages, // ✅
+    isLoadingMessages, // ✅
+    totalMessages, // ✅
   };
 };
 

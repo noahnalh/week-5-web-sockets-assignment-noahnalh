@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -20,19 +19,22 @@ const io = new Server(server, {
   },
 });
 
+// Ensure upload folder exists
 const uploadDir = path.join(__dirname, "public/uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
+// Multer config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
 });
 const upload = multer({ storage });
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(uploadDir));
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 const users = {}; // socket.id => { username, id }
 const userRooms = {}; // socket.id => room
@@ -88,26 +90,34 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
       reactions: {},
     };
-    messages[room] = messages[room] || [];
+
+    if (!messages[room]) messages[room] = [];
     messages[room].push(msg);
-    if (messages[room].length > 100) messages[room].shift();
+    if (messages[room].length > 500) messages[room].shift(); // limit
+
     io.to(room).emit("receive_message", msg);
   });
 
   socket.on("add_reaction", ({ messageId, emoji, room }) => {
-    const msg = messages[room]?.find((m) => m.id === messageId);
+    const roomMessages = messages[room];
+    if (!roomMessages) return;
+
+    const msg = roomMessages.find((m) => m.id === messageId);
     if (!msg) return;
 
-    msg.reactions ||= {};
-    msg.reactions[emoji] ||= [];
+    if (!msg.reactions) msg.reactions = {};
+    if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
 
     const userId = socket.id;
-    const index = msg.reactions[emoji].indexOf(userId);
-    if (index === -1) {
+    const userIndex = msg.reactions[emoji].indexOf(userId);
+
+    if (userIndex === -1) {
       msg.reactions[emoji].push(userId);
     } else {
-      msg.reactions[emoji].splice(index, 1);
-      if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+      msg.reactions[emoji].splice(userIndex, 1);
+      if (msg.reactions[emoji].length === 0) {
+        delete msg.reactions[emoji];
+      }
     }
 
     io.to(room).emit("receive_message", msg);
@@ -117,7 +127,8 @@ io.on("connection", (socket) => {
     const username = users[socket.id]?.username;
     if (!username) return;
 
-    typingUsers[room] ||= {};
+    if (!typingUsers[room]) typingUsers[room] = {};
+
     if (isTyping) {
       typingUsers[room][socket.id] = username;
     } else {
@@ -135,12 +146,12 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ✅ Private messaging with notification
   socket.on("private_message", ({ to, message }) => {
     const fromUser = users[socket.id];
     const toSocketId = Object.keys(users).find(
       (id) => users[id].username === to
     );
+
     if (!fromUser || !toSocketId) return;
 
     const room = [fromUser.username, to].sort().join("_");
@@ -156,26 +167,26 @@ io.on("connection", (socket) => {
       readBy: [socket.id],
     };
 
-    messages[room] ||= [];
+    if (!messages[room]) messages[room] = [];
     messages[room].push(privateMsg);
 
     socket.join(room);
     const recipientSocket = io.sockets.sockets.get(toSocketId);
-    if (recipientSocket) recipientSocket.join(room);
+    if (recipientSocket) {
+      recipientSocket.join(room);
+    }
 
-    // Notify both
     io.to(room).emit("private_message", privateMsg);
-
-    // 🔔 Notify recipient directly even if not in room
-    recipientSocket?.emit("notify", privateMsg);
   });
 
   socket.on("disconnect", () => {
     const username = users[socket.id]?.username;
     const room = userRooms[socket.id];
+
     if (room) {
       socket.leave(room);
       delete typingUsers[room]?.[socket.id];
+
       io.to(room).emit("user_left", { username, id: socket.id });
       io.to(room).emit("user_list", getUsersInRoom(room));
       io.to(room).emit("typing_users", getTypingUsersInRoom(room));
@@ -183,17 +194,33 @@ io.on("connection", (socket) => {
 
     delete users[socket.id];
     delete userRooms[socket.id];
+
+    console.log(`❌ ${username || "User"} disconnected`);
   });
 });
 
+// ✅ Upload endpoint
 app.post("/api/upload", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  res.json({ fileUrl: `/uploads/${req.file.filename}` });
+
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ fileUrl });
 });
 
+// ✅ Message pagination endpoint
 app.get("/api/messages/:room", (req, res) => {
   const room = req.params.room || "global";
-  res.json(messages[room] || []);
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+
+  const roomMessages = messages[room] || [];
+  const total = roomMessages.length;
+
+  const start = Math.max(total - page * limit, 0);
+  const end = total - (page - 1) * limit;
+
+  const paginated = roomMessages.slice(start, end);
+  res.json({ messages: paginated, total });
 });
 
 app.get("/api/users/:room", (req, res) => {
