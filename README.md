@@ -148,7 +148,3 @@ Created by **Your Name**
 This project is open-source and free to use.
 
 ---
-
-## 📝 License
-
-MIT
