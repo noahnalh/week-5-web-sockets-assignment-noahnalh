@@ -105,6 +105,12 @@ pnpm run dev
 - Sound notifications for new private messages  
 - Browser push notifications for private messages (when tab is inactive)  
 
+
+🩺 Health check endpoint:  
+GET /health → Returns 200 OK  
+Used by monitoring tools to check server uptime.
+
+
 ---
 
 ## 📁 Project Folder Structure
