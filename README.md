@@ -2,11 +2,11 @@
 
 A full-stack real-time chat application that supports:
 
-- Global and private rooms
-- File sharing and uploads
-- Typing indicators and read receipts
-- Emoji reactions
-- Browser and sound notifications
+- Global and private rooms  
+- File sharing and uploads  
+- Typing indicators and read receipts  
+- Emoji reactions  
+- Browser and sound notifications  
 - Responsive design with dark mode
 
 ---
@@ -19,6 +19,13 @@ This project is a modern real-time chat application built using:
 - **Socket.IO** for real-time messaging  
 - **Express.js** backend with **Multer** for file uploads  
 - Features like emoji reactions, typing indicators, file upload progress, read receipts, room switching, and mobile responsiveness make this a feature-rich app.
+
+---
+
+## 🌐 Live Demo
+
+- **Frontend**: [https://week-5-web-sockets-assignment-noahn.vercel.app](https://week-5-web-sockets-assignment-noahn.vercel.app)  
+- **Backend API**: [https://week-5-web-sockets-assignment-noahnalh.onrender.com](https://week-5-web-sockets-assignment-noahnalh.onrender.com)
 
 ---
 
@@ -37,7 +44,7 @@ cd week-5-web-sockets-assignment-noahnalh
 
 ```bash
 cd server
-npm install
+pnpm install
 ```
 
 Create `.env` file inside `server/`:
@@ -52,7 +59,6 @@ Then run the server:
 node server.js
 ```
 
-
 ---
 
 ### 3. Client Setup
@@ -63,42 +69,41 @@ pnpm install
 pnpm run dev
 ```
 
-
 ---
 
 ## ✨ Features Implemented
 
 ### ✅ Core Chat Features
 
-- Real-time messaging using Socket.IO
-- Global room and private 1:1 chat support
-- Typing indicators per room
-- Read receipts for each message
-- Pagination for older messages
+- Real-time messaging using Socket.IO  
+- Global room and private 1:1 chat support  
+- Typing indicators per room  
+- Read receipts for each message  
+- Pagination for older messages  
 
 ### ✅ File Sharing
 
-- Upload and send any file
-- Upload progress indicator
-- Shareable download links
+- Upload and send any file  
+- Upload progress indicator  
+- Shareable download links  
 
 ### ✅ Reactions
 
-- Emoji reaction toggling (👍 ❤️ 😂 🔥)
-- Real-time sync between all clients
+- Emoji reaction toggling (👍 ❤️ 😂 🔥)  
+- Real-time sync between all clients  
 
 ### ✅ User Experience
 
-- Dark/light mode
-- Scroll to bottom button
-- Search messages in current room
-- Mobile-friendly responsive UI
-- Reconnection notifications
+- Dark/light mode  
+- Scroll to bottom button  
+- Search messages in current room  
+- Mobile-friendly responsive UI  
+- Reconnection notifications  
 
 ### ✅ Notifications
 
-- Sound notifications for new private messages
-- Browser push notifications for private messages (when tab is inactive)
+- Sound notifications for new private messages  
+- Browser push notifications for private messages (when tab is inactive)  
 
 ---
 
@@ -146,5 +151,3 @@ PORT=3000
 
 Created by **Noah**  
 This project is open-source and free to use.
-
----
