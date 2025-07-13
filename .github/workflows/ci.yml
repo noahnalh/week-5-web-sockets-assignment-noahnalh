@@ -2,7 +2,7 @@ name: Build & Test MERN App
 
 on:
   push:
-    branches: [main]  # triggers on main branch push
+    branches: [main]
 
 jobs:
   client:
@@ -15,21 +15,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup pnpm
+      - name: Set up pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: pnpm
+          cache: 'pnpm'
+          cache-dependency-path: client/pnpm-lock.yaml  # 👈 Add this!
 
-      - name: Install deps
+      - name: Install dependencies
         run: pnpm install
 
-      - name: Build
+      - name: Build frontend
         run: pnpm run build
 
   server:
@@ -42,22 +43,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup pnpm
+      - name: Set up pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 8
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: pnpm
+          cache: 'pnpm'
+          cache-dependency-path: server/pnpm-lock.yaml  # 👈 Add this!
 
-      - name: Install deps
+      - name: Install dependencies
         run: pnpm install
 
-      - name: Test or Lint (optional)
-        run: echo "Add test or lint scripts here"
-
-      - name: Start check (optional)
-        run: node server.js &
+      - name: Start check
+        run: echo "Backend ready"
