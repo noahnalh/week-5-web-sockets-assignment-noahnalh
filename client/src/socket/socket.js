@@ -12,6 +12,9 @@ export const socket = io(SOCKET_URL, {
 
 export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(socket.connected);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+
   const [lastMessage, setLastMessage] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -53,6 +56,13 @@ export const useSocket = () => {
   };
 
   const sendPrivateMessage = (to, message) => {
+    const from = usernameRef.current;
+    const privateRoom = [from, to].sort().join("_");
+
+    setCurrentRoom(privateRoom);
+    roomRef.current = privateRoom;
+    setUnreadCounts((prev) => ({ ...prev, [privateRoom]: 0 }));
+
     socket.emit("private_message", { to, message });
   };
 
@@ -102,9 +112,43 @@ export const useSocket = () => {
     }
   };
 
+  const fetchMessages = async (room, page = 1, limit = 20) => {
+    try {
+      const res = await fetch(
+        `/api/messages/${encodeURIComponent(room)}?offset=${
+          (page - 1) * limit
+        }&limit=${limit}`
+      );
+      if (!res.ok) return false;
+
+      const data = await res.json();
+      const sorted = data.sort(
+        (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+      );
+
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id));
+        const newMessages = sorted.filter((m) => !existingIds.has(m.id));
+        return [...newMessages, ...prev];
+      });
+
+      return sorted.length > 0;
+    } catch (err) {
+      console.error("Failed to fetch messages", err);
+      return false;
+    }
+  };
+
   useEffect(() => {
     const handleConnect = () => {
       setIsConnected(true);
+      setReconnecting(false);
+
+      // Handle reconnect status
+      setConnectionStatus((prev) =>
+        prev === "disconnected" ? "reconnected" : "connected"
+      );
+
       const username = usernameRef.current;
       const room = roomRef.current;
 
@@ -117,7 +161,10 @@ export const useSocket = () => {
       }
     };
 
-    const handleDisconnect = () => setIsConnected(false);
+    const handleDisconnect = () => {
+      setIsConnected(false);
+      setConnectionStatus("disconnected");
+    };
 
     const handleMessageRead = ({ messageId, readerId }) => {
       setMessages((prev) =>
@@ -178,6 +225,29 @@ export const useSocket = () => {
       }
     };
 
+    const handleMessageDelivered = ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, delivered: true } : msg
+        )
+      );
+    };
+
+    // ✅ Socket.io low-level reconnection events
+    socket.io.on("reconnect_attempt", () => {
+      setReconnecting(true);
+    });
+
+    socket.io.on("reconnect", () => {
+      setReconnecting(false);
+      setConnectionStatus("reconnected");
+    });
+
+    socket.io.on("reconnect_failed", () => {
+      setReconnecting(false);
+      setConnectionStatus("disconnected");
+    });
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("receive_message", handleIncomingMessage);
@@ -189,6 +259,7 @@ export const useSocket = () => {
     socket.on("user_left", handleUserLeft);
     socket.on("typing_users", handleTypingUsers);
     socket.on("notify_message", handleNotifyMessage);
+    socket.on("message_delivered", handleMessageDelivered);
 
     return () => {
       socket.off("connect", handleConnect);
@@ -202,12 +273,19 @@ export const useSocket = () => {
       socket.off("user_left", handleUserLeft);
       socket.off("typing_users", handleTypingUsers);
       socket.off("notify_message", handleNotifyMessage);
+      socket.off("message_delivered", handleMessageDelivered);
+
+      socket.io.off("reconnect_attempt");
+      socket.io.off("reconnect");
+      socket.io.off("reconnect_failed");
     };
   }, []);
 
   return {
     socket,
     isConnected,
+    reconnecting,
+    connectionStatus, // 👈 Exposed for ChatRoom banner
     lastMessage,
     messages,
     users,
@@ -221,6 +299,7 @@ export const useSocket = () => {
     markMessageAsRead,
     addReaction,
     unreadCounts,
+    fetchMessages,
   };
 };
 

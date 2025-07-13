@@ -42,7 +42,6 @@ const userRooms = {}; // socket.id => current room
 const messages = {}; // room => [message]
 const typingUsers = {}; // room => { socketId: username }
 
-// Helpers
 const getUsersInRoom = (room) => {
   return Object.entries(users)
     .filter(([id]) => userRooms[id] === room)
@@ -52,7 +51,6 @@ const getUsersInRoom = (room) => {
 const getTypingUsersInRoom = (room) =>
   typingUsers[room] ? Object.values(typingUsers[room]) : [];
 
-// Socket.io
 io.on("connection", (socket) => {
   console.log(`✅ User connected: ${socket.id}`);
 
@@ -96,12 +94,14 @@ io.on("connection", (socket) => {
       readBy: [socket.id],
       timestamp: new Date().toISOString(),
       reactions: {},
+      delivered: true,
     };
 
     messages[room].push(msg);
-    if (messages[room].length > 100) messages[room].shift();
+    if (messages[room].length > 1000) messages[room].shift();
 
     io.to(room).emit("receive_message", msg);
+    socket.emit("message_delivered", { messageId: msg.id });
   });
 
   socket.on("add_reaction", ({ messageId, emoji, room }) => {
@@ -150,7 +150,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Fixed private messaging logic here:
   socket.on("private_message", ({ to, message }) => {
     const fromUser = users[socket.id];
     const toSocketId = Object.keys(users).find(
@@ -171,22 +170,20 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
       readBy: [socket.id],
       reactions: {},
+      delivered: true,
     };
 
     messages[room] ||= [];
     messages[room].push(privateMsg);
 
-    // Ensure sender leaves old room and joins private room
     const oldRoom = userRooms[socket.id];
     if (oldRoom && oldRoom !== room) socket.leave(oldRoom);
 
-    // Join private room for sender and recipient
     socket.join(room);
     userRooms[socket.id] = room;
 
     const recipientSocket = io.sockets.sockets.get(toSocketId);
     if (recipientSocket) {
-      // Recipient joins private room too
       const recipientOldRoom = userRooms[toSocketId];
       if (recipientOldRoom && recipientOldRoom !== room)
         recipientSocket.leave(recipientOldRoom);
@@ -194,10 +191,8 @@ io.on("connection", (socket) => {
       recipientSocket.join(room);
       userRooms[toSocketId] = room;
 
-      // Emit private message to entire private room
       io.to(room).emit("private_message", privateMsg);
 
-      // Notify recipient if they're not currently in private room
       if (recipientOldRoom !== room) {
         recipientSocket.emit("notify_message", {
           from: fromUser.username,
@@ -206,9 +201,10 @@ io.on("connection", (socket) => {
         });
       }
     } else {
-      // Just emit to sender if recipient offline
       socket.emit("private_message", privateMsg);
     }
+
+    socket.emit("message_delivered", { messageId: privateMsg.id });
   });
 
   socket.on("disconnect", () => {
@@ -238,10 +234,20 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   res.json({ fileUrl });
 });
 
-// REST endpoints
+// Paginated message API
 app.get("/api/messages/:room", (req, res) => {
   const room = req.params.room || "global";
-  res.json(messages[room] || []);
+  const offset = parseInt(req.query.offset) || 0;
+  const limit = parseInt(req.query.limit) || 20;
+
+  const allMessages = messages[room] || [];
+  const paginated = allMessages
+    .slice()
+    .reverse()
+    .slice(offset, offset + limit)
+    .reverse();
+
+  res.json(paginated);
 });
 
 app.get("/api/users/:room", (req, res) => {
@@ -253,7 +259,7 @@ app.get("/", (req, res) => {
   res.send("Socket.io Chat Server is running");
 });
 
-// Start Server
+// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

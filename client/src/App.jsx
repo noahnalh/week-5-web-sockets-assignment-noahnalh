@@ -84,6 +84,23 @@ const App = () => {
         >
           {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
         </button>
+
+        {/* 🔌 Reconnection Banner */}
+        {!isConnected && (
+          <div
+            style={{
+              background: "#ffcccc",
+              color: "#900",
+              padding: "8px 12px",
+              borderRadius: 5,
+              fontWeight: "bold",
+              marginTop: 10,
+              display: "inline-block",
+            }}
+          >
+            🔌 Reconnecting to server...
+          </div>
+        )}
       </div>
 
       {!isLoggedIn ? (
