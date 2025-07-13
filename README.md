@@ -1,37 +1,38 @@
 # 💬 Real-Time Chat App (Socket.IO + React + Node.js)
 
-A full-stack real-time chat application that supports:
+A full-stack real-time chat application featuring:
 
-- Global and private rooms  
-- File sharing and uploads  
-- Typing indicators and read receipts  
-- Emoji reactions  
-- Browser and sound notifications  
-- Responsive design with dark mode
+- 🌍 Global and private chat rooms  
+- 📁 File sharing with upload progress  
+- ✍️ Typing indicators and ✅ read receipts  
+- 🔥 Emoji reactions  
+- 🔔 Browser and sound notifications  
+- 🌙 Responsive dark/light mode design  
 
 ---
 
 ## 🧠 Project Overview
 
-This project is a modern real-time chat application built using:
+This is a modern real-time chat app built with:
 
-- **React (Vite)** for the frontend  
-- **Socket.IO** for real-time messaging  
-- **Express.js** backend with **Multer** for file uploads  
-- Features like emoji reactions, typing indicators, file upload progress, read receipts, room switching, and mobile responsiveness make this a feature-rich app.
+- **Frontend**: React (Vite)  
+- **Backend**: Express.js + Socket.IO  
+- **File Uploads**: Multer (via Express)  
+- **Realtime**: WebSocket-based messaging with typing indicators, read receipts, reactions, and reconnections  
+- **UI/UX**: Fully responsive, mobile-friendly, dark mode, file uploads, sound alerts, and search
 
 ---
 
 ## 🌐 Live Demo
 
-- **Frontend**: [https://week-5-web-sockets-assignment-noahn.vercel.app](https://week-5-web-sockets-assignment-noahn.vercel.app)  
-- **Backend API**: [https://week-5-web-sockets-assignment-noahnalh.onrender.com](https://week-5-web-sockets-assignment-noahnalh.onrender.com)
+- 🔗 **Frontend**: [week-5-web-sockets-assignment-noahn.vercel.app](https://week-5-web-sockets-assignment-noahn.vercel.app)  
+- 🛠 **Backend API**: [week-5-web-sockets-assignment-noahnalh.onrender.com](https://week-5-web-sockets-assignment-noahnalh.onrender.com)
 
 ---
 
 ## 🚀 Setup Instructions
 
-### 1. Clone the repository
+### 🔧 1. Clone the Repository
 
 ```bash
 git clone https://github.com/PLP-MERN-Stack-Development/week-5-web-sockets-assignment-noahnalh.git
@@ -40,20 +41,20 @@ cd week-5-web-sockets-assignment-noahnalh
 
 ---
 
-### 2. Server Setup
+### 🖥 2. Backend Setup
 
 ```bash
 cd server
 pnpm install
 ```
 
-Create `.env` file inside `server/`:
+Create a `.env` file in `server/`:
 
 ```env
 PORT=3000
 ```
 
-Then run the server:
+Start the backend:
 
 ```bash
 node server.js
@@ -61,7 +62,7 @@ node server.js
 
 ---
 
-### 3. Client Setup
+### 💻 3. Frontend Setup
 
 ```bash
 cd ../client
@@ -69,51 +70,88 @@ pnpm install
 pnpm run dev
 ```
 
+Visit `http://localhost:5173` in your browser.
+
 ---
 
-## ✨ Features Implemented
+## ✨ Features
 
-### ✅ Core Chat Features
+### 💬 Core Chat
 
-- Real-time messaging using Socket.IO  
-- Global room and private 1:1 chat support  
+- Real-time messaging with Socket.IO  
+- Global room + private 1-on-1 chats  
 - Typing indicators per room  
-- Read receipts for each message  
-- Pagination for older messages  
+- Read receipts (per recipient)  
+- Infinite scroll / message pagination  
 
-### ✅ File Sharing
+### 📁 File Sharing
 
-- Upload and send any file  
-- Upload progress indicator  
-- Shareable download links  
+- Upload any file type  
+- Progress indicator + download links  
 
-### ✅ Reactions
+### 🔥 Reactions
 
 - Emoji reaction toggling (👍 ❤️ 😂 🔥)  
-- Real-time sync between all clients  
+- Real-time synced reactions  
 
-### ✅ User Experience
+### 🧑‍💻 User Experience
 
-- Dark/light mode  
-- Scroll to bottom button  
-- Search messages in current room  
-- Mobile-friendly responsive UI  
-- Reconnection notifications  
+- Dark/light mode toggle  
+- Mobile-first responsive UI  
+- Scroll-to-bottom button  
+- Message search within rooms  
+- Auto-reconnect with user status  
 
-### ✅ Notifications
+### 🔔 Notifications
 
-- Sound notifications for new private messages  
-- Browser push notifications for private messages (when tab is inactive)  
-
-
-🩺 Health check endpoint:  
-GET /health → Returns 200 OK  
-Used by monitoring tools to check server uptime.
-
+- Browser push notifications (for private messages)  
+- Sound alerts for new messages  
 
 ---
 
-## 📁 Project Folder Structure
+## ⚙️ Health Check & Monitoring
+
+- Health endpoint:  
+  `GET /health` → Returns `200 OK`  
+  Useful for uptime monitoring (e.g., UptimeRobot)
+
+- [Optional] Monitoring tools:
+  - UptimeRobot / Pingdom (server health)
+  - Sentry (error logging)
+  - PM2 (process monitoring)
+
+---
+
+## 🔁 CI/CD (GitHub Actions)
+
+This project includes:
+
+- ✅ Auto-install and build frontend/backend on push  
+- ✅ Linting and error checks  
+- ✅ Vite build check in client  
+- ✅ Node.js boot check in server
+
+> 📸 Add screenshots of the CI pipeline running in `.github/screenshots/` and embed below:
+
+### 🖼 CI/CD Pipeline
+
+![CI/CD Workflow](client/public/screenshots/ci-cd.png)
+
+---
+
+## 🧾 .env Configuration
+
+Create this inside `server/.env`:
+
+```
+PORT=3000
+```
+
+If using deployed environments (e.g., Render/Vercel), configure `SOCKET_URL`, `API_URL`, etc., as needed.
+
+---
+
+## 📁 Folder Structure
 
 ```
 root/
@@ -121,7 +159,9 @@ root/
 ├── client/
 │   ├── public/
 │   │   ├── uploads/
-│   │   └── notify.mp3
+│   │   ├── notify.mp3
+│   │   └── screenshots/
+│   │       └── ci-cd.png
 │   ├── src/
 │   │   ├── components/
 │   │   │   └── Sidebar.jsx
@@ -130,12 +170,10 @@ root/
 │   │   ├── App.jsx
 │   │   ├── Main.jsx
 │   │   └── index.css
-│   ├── index.html
-│   ├── vite.config.js
+│   ├── vite.config.mjs
 │   └── package.json
 ├── server/
-│   ├── public/
-│   │   └── uploads/
+│   ├── public/uploads/
 │   ├── server.js
 │   ├── .env
 │   └── package.json
@@ -143,17 +181,11 @@ root/
 
 ---
 
-## 🧾 .env Configuration
+## 👨‍💻 Author
 
-Create a `.env` file in the `server/` folder:
-
-```
-PORT=3000
-```
+Built by **Noah**  
+Real-time MERN Stack Developer 🚀  
+This project is open-source and free to use.
 
 ---
 
-## 🧑‍💻 Author
-
-Created by **Noah**  
-This project is open-source and free to use.
